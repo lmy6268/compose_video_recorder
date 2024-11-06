@@ -1,11 +1,13 @@
 package com.example.video_recorder_test.data
 
 import android.annotation.SuppressLint
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.os.Build
+import android.provider.MediaStore
 import android.util.DisplayMetrics
 import android.util.Rational
 import android.util.Size
@@ -22,12 +24,17 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
+import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
+import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
+import com.arthenica.ffmpegkit.FFmpegKit
 import com.example.video_recorder_test.domain.CameraRepository
 import com.example.video_recorder_test.model.CaptureImageInfo
 import com.example.video_recorder_test.model.ImageFrame
@@ -39,6 +46,8 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.text.SimpleDateFormat
+import java.util.Locale
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -50,6 +59,9 @@ class CameraRepositoryImpl @Inject constructor(
     companion object {
         const val TAG = "CameraRepositoryImpl"
     }
+
+
+    private var videoRecording: Recording? = null
 
     private val displayRational by lazy {
         val windowManager = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
@@ -241,9 +253,42 @@ class CameraRepositoryImpl @Inject constructor(
         )
     }
 
-    private fun calculateAspectRatio(): Rational {
-        //지정된 화면 비율에 맞추어 크롭할 수 있도록
-        return displayRational
+    @SuppressLint("MissingPermission")
+    override fun startRecording() {
+        val fileName = "CameraX-recording-" +
+                SimpleDateFormat("yyyy-mm-dd", Locale.US)
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+        }
+
+        val mediaStoreOutput = MediaStoreOutputOptions.Builder(
+            context.contentResolver,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Video.Media.getContentUri(
+                    MediaStore.VOLUME_EXTERNAL
+                )
+            } else {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            }
+        ).setContentValues(contentValues).build()
+
+
+        FFmpegKit.executeAsync("") {
+
+        }
+
+
+        videoRecording =
+            videoCapture.output.prepareRecording(context, mediaStoreOutput).withAudioEnabled()
+                .start(cameraExecutor) {
+                    Timber.tag("Video Capture Status").d("${it.recordingStats}")
+                }
+    }
+
+
+    override fun stopRecording() {
+        videoRecording?.stop()
     }
 
 

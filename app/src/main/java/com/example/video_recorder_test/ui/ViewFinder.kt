@@ -1,5 +1,6 @@
 package com.example.video_recorder_test.ui
 
+import android.graphics.BitmapFactory
 import android.opengl.GLSurfaceView
 import android.view.OrientationEventListener
 import android.view.ViewGroup
@@ -15,28 +16,38 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.video_recorder_test.R
 import jp.co.cyberagent.android.gpuimage.GPUImageView
 import jp.co.cyberagent.android.gpuimage.GPUImageView.RENDERMODE_WHEN_DIRTY
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageLookupFilter
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.callbackFlow
+import java.util.Locale
 
 @Composable
 fun CameraViewFinder(
@@ -92,7 +103,8 @@ fun CameraViewFinder(
     }
 
     LaunchedEffect(isRecording) {
-
+        if (isRecording) viewModel.startRecording()
+        else viewModel.stopRecording()
 
     }
     LaunchedEffect(currentMode) {
@@ -111,10 +123,26 @@ fun CameraViewFinder(
         }
         else {
             Box(modifier = modifier.fillMaxSize()) {
+
+                if (isRecording) RecordTimeIndicator(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 50.dp)
+                        .zIndex(1f)
+                )
+
+
+
                 AndroidView(
                     factory = {
                         GPUImageView(it).apply {
                             setRenderMode(RENDERMODE_WHEN_DIRTY)
+                            filter = GPUImageLookupFilter().apply {
+                                bitmap = BitmapFactory.decodeResource(
+                                    context.resources,
+                                    R.drawable.filter_1
+                                )
+                            }
                             layoutParams = ViewGroup.LayoutParams(
                                 ViewGroup.LayoutParams.WRAP_CONTENT,
                                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -164,5 +192,48 @@ fun CameraViewFinder(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun RecordTimeIndicator(
+    modifier: Modifier = Modifier,
+) {
+    val textStyle = remember {
+        TextStyle(
+            color = Color.White
+        )
+    }
+    var elapsedTime by remember { mutableLongStateOf(0L) }
+    // 포맷된 시간 문자열
+    val timeText by remember {
+        derivedStateOf {
+            val hours = (elapsedTime / 3600000) % 24 // 시 계산
+            val minutes = (elapsedTime / 60000) % 60 // 분 계산
+            val seconds = (elapsedTime / 1000) % 60 // 초 계산
+
+            // 두 자리로 표시
+            String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+        }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000L)
+            elapsedTime += 1000L // 1초씩 더해줌
+        }
+    }
+
+    val backgroundRed = Color(0xFFeb4d3c)
+
+    Box(
+        modifier = modifier
+            .background(backgroundRed)
+            .clip(RoundedCornerShape(9.dp)),
+    ) {
+        Text(
+            modifier = Modifier.padding(vertical = 3.dp, horizontal = 5.dp),
+            text = timeText,
+            style = textStyle
+        )
     }
 }

@@ -47,6 +47,10 @@ class MainViewModel @Inject constructor(
 
 
     fun startRecording(){
+        repository.startRecording()
+    }
 
+    fun stopRecording(){
+        repository.stopRecording()
     }
 }

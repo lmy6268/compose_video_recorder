@@ -14,6 +14,7 @@ ksp = "1.9.0-1.0.12"
 gpuImage = "2.1.0"
 timber = "5.0.1"
 hiltNavigation = "1.2.0"
+ffmpeg = "6.0-2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -44,6 +45,8 @@ hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref
 gpuImage = { group = "jp.co.cyberagent.android", name = "gpuimage", version.ref = "gpuImage" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigation" }
+
+ffmpeg = { module = "com.arthenica:ffmpeg-kit-full", version.ref = "ffmpeg" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

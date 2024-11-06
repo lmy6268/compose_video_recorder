@@ -13,4 +13,7 @@ interface CameraRepository {
 
   suspend  fun changeMode(cameraMode: String): Flow<ImageFrame>
     suspend fun takeCapture(): ImageFrame
+
+    fun startRecording()
+    fun stopRecording()
 }
