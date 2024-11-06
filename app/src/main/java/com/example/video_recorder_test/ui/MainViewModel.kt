@@ -19,12 +19,34 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
     private var _frame = MutableStateFlow<ImageFrame?>(null)
     val frame = _frame.asStateFlow()
-    fun initializeCamera(lifecycleOwner: LifecycleOwner) {
+    private var _latestCaptureImage = MutableStateFlow<ImageFrame?>(null)
+    val latestCaptureImage = _latestCaptureImage.asStateFlow()
+    fun initializeCamera(lifecycleOwner: LifecycleOwner, rotationDegree: Int) {
         viewModelScope.launch {
-            repository.initializeCamera(lifecycleOwner)
+            repository.initializeCamera(lifecycleOwner, rotationDegree)
                 .collectLatest {
                     _frame.value = it
                 }
         }
+    }
+
+    fun changeMode(mode: String) {
+        viewModelScope.launch {
+            repository.changeMode(mode).collectLatest {
+                _frame.value = it
+            }
+        }
+    }
+
+
+    fun takePhoto() {
+        viewModelScope.launch {
+            _latestCaptureImage.value = repository.takeCapture()
+        }
+    }
+
+
+    fun startRecording(){
+
     }
 }
