@@ -12,7 +12,7 @@ android {
     defaultConfig {
         applicationId = "com.example.video_recorder_test"
         minSdk = 26
-        targetSdk = 34
+        lint.targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -68,8 +68,8 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     //GPUImage
-    implementation(libs.gpuImage)
-
+    implementation(projects.gpuImage)
+    implementation(projects.gpuv)
 
     //Timber
     implementation(libs.timber)
@@ -77,6 +77,5 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     //data
 
-    implementation(libs.ffmpeg)
 
 }

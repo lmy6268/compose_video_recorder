@@ -1,3 +1,5 @@
+import java.net.URL
+
 pluginManagement {
     repositories {
         google {
@@ -9,6 +11,9 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        maven {
+            setUrl("https://jitpack.io")
+        }
     }
 }
 dependencyResolutionManagement {
@@ -18,7 +23,9 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-
+//https://proandroiddev.com/using-type-safe-project-dependencies-on-gradle-493ab7337aa
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 rootProject.name = "video_recorder_test"
 include(":app")
- 
+include(":gpuv")
+include(":gpuImage")

@@ -1,8 +1,10 @@
 package com.example.video_recorder_test.ui
 
+import android.app.Activity
 import android.graphics.BitmapFactory
 import android.opengl.GLSurfaceView
 import android.view.OrientationEventListener
+import android.view.View
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Image
@@ -15,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -40,9 +41,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.daasuu.gpuv.camerarecorder.GPUCameraRecorder
+import com.daasuu.gpuv.camerarecorder.GPUCameraRecorderBuilder
+import com.daasuu.gpuv.camerarecorder.LensFacing
 import com.example.video_recorder_test.R
 import jp.co.cyberagent.android.gpuimage.GPUImageView
-import jp.co.cyberagent.android.gpuimage.GPUImageView.RENDERMODE_WHEN_DIRTY
+import jp.co.cyberagent.android.gpuimage.GPUImageView.Companion.RENDERMODE_WHEN_DIRTY
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageFilterGroup
 import jp.co.cyberagent.android.gpuimage.filter.GPUImageLookupFilter
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -74,7 +79,9 @@ fun CameraViewFinder(
     }
 
     var currentMode by remember { mutableStateOf("Photo") }
-
+    var recorder by remember {
+        mutableStateOf<GPUCameraRecorder?>(null)
+    }
     val targetRotation by remember {
         callbackFlow {
             val listener = object : OrientationEventListener(context) {
@@ -102,14 +109,39 @@ fun CameraViewFinder(
         viewModel.initializeCamera(owner, rotationDegree = targetRotation)
     }
 
+
+    val gpuImageView = remember {
+        GPUImageView(context).apply {
+            setRenderMode(RENDERMODE_WHEN_DIRTY)
+            setFilter(GPUImageFilterGroup().apply {
+                addFilter(GPUImageLookupFilter().apply {
+                    bitmap = BitmapFactory.decodeResource(
+                        context.resources,
+                        R.drawable.filter_1
+                    )
+                })
+            })
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            setBackgroundColor(android.graphics.Color.WHITE)
+        }
+    }
+
+    val gpuPreview = remember {
+        GLSurfaceView(context).apply {
+            recorder = GPUCameraRecorderBuilder(context as Activity, this).apply {
+                lensFacing(LensFacing.BACK)
+            }.build()
+        }
+    }
+
+
     LaunchedEffect(isRecording) {
-        if (isRecording) viewModel.startRecording()
-        else viewModel.stopRecording()
 
     }
-    LaunchedEffect(currentMode) {
-        viewModel.changeMode(currentMode)
-    }
+
     AnimatedContent(targetState = showCaptureImage, label = "프리뷰 화면") { value ->
         if (value) latestCaptureImage?.data?.let {
             Image(
@@ -131,31 +163,24 @@ fun CameraViewFinder(
                         .zIndex(1f)
                 )
 
-
-
-                AndroidView(
-                    factory = {
-                        GPUImageView(it).apply {
-                            setRenderMode(RENDERMODE_WHEN_DIRTY)
-                            filter = GPUImageLookupFilter().apply {
-                                bitmap = BitmapFactory.decodeResource(
-                                    context.resources,
-                                    R.drawable.filter_1
-                                )
-                            }
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT
-                            )
-                            setBackgroundColor(android.graphics.Color.WHITE)
+                when (currentMode) {
+                    "Video" -> AndroidView(
+                        factory = {
+                            gpuPreview
+                        },
+                        update = {
                         }
-                    },
-                    update = {
-                        frame?.data?.let { bitmap ->
-                            it.setImage(bitmap)
+                    )
+
+                    else -> AndroidView(
+                        factory = {
+                            gpuImageView
+                        },
+                        update = {
+                            frame?.data?.let { image -> it.setImage(image) }
                         }
-                    }
-                )
+                    )
+                }
                 Row(
                     Modifier
                         .padding(bottom = 10.dp)

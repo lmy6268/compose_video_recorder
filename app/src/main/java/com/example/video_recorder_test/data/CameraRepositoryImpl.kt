@@ -30,11 +30,8 @@ import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
-import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
-import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
-import com.arthenica.ffmpegkit.FFmpegKit
 import com.example.video_recorder_test.domain.CameraRepository
 import com.example.video_recorder_test.model.CaptureImageInfo
 import com.example.video_recorder_test.model.ImageFrame
@@ -179,7 +176,7 @@ class CameraRepositoryImpl @Inject constructor(
         }
 
     override suspend fun changeMode(cameraMode: String): Flow<ImageFrame> {
-        this.currentMode = cameraMode
+//        this.currentMode = cameraMode
         return bindCameraToLifeCycle()
     }
 
@@ -274,9 +271,6 @@ class CameraRepositoryImpl @Inject constructor(
         ).setContentValues(contentValues).build()
 
 
-        FFmpegKit.executeAsync("") {
-
-        }
 
 
         videoRecording =

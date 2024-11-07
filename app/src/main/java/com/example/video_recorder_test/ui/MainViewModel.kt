@@ -1,13 +1,14 @@
 package com.example.video_recorder_test.ui
 
+import android.content.Context
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.video_recorder_test.domain.CameraRepository
 import com.example.video_recorder_test.model.ImageFrame
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -15,6 +16,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: CameraRepository
 ) : ViewModel() {
     private var _frame = MutableStateFlow<ImageFrame?>(null)
@@ -46,11 +48,13 @@ class MainViewModel @Inject constructor(
     }
 
 
-    fun startRecording(){
-        repository.startRecording()
+    fun startRecording() {
+
     }
 
-    fun stopRecording(){
-        repository.stopRecording()
+    fun stopRecording() {
+
     }
+
+
 }
