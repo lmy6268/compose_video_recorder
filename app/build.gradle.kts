@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.video_recorder_test"
-        minSdk = 26
+        minSdk = 27
         lint.targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -69,10 +69,11 @@ dependencies {
 
     //GPUImage
     implementation(projects.gpuImage)
-    implementation(projects.gpuv)
 
     //Timber
     implementation(libs.timber)
+
+    implementation(projects.opencv)
 
     implementation(libs.androidx.hilt.navigation.compose)
     //data

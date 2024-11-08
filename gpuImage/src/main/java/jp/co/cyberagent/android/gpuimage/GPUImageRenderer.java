@@ -31,6 +31,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.LinkedList;
+import java.util.Objects;
 import java.util.Queue;
 
 import javax.microedition.khronos.egl.EGLConfig;
@@ -43,13 +44,7 @@ import jp.co.cyberagent.android.gpuimage.util.TextureRotationUtil;
 
 import static jp.co.cyberagent.android.gpuimage.util.TextureRotationUtil.TEXTURE_NO_ROTATION;
 
-import com.daasuu.gpuv.camerarecorder.capture.MediaVideoEncoder;
-
-public class GPUImageRenderer implements GLSurfaceView.Renderer, GLTextureView.Renderer, PreviewCallback {
-    private MediaVideoEncoder videoEncoder;
-
-
-
+public class GPUImageRenderer implements GLSurfaceView.Renderer, GLTextureView.Renderer {
     private static final int NO_IMAGE = -1;
     public static final float CUBE[] = {
             -1.0f, -1.0f,
@@ -148,37 +143,31 @@ public class GPUImageRenderer implements GLSurfaceView.Renderer, GLTextureView.R
     private void runAll(Queue<Runnable> queue) {
         synchronized (queue) {
             while (!queue.isEmpty()) {
-                queue.poll().run();
+                Objects.requireNonNull(queue.poll()).run();
             }
         }
     }
 
-    @Override
-    public void onPreviewFrame(final byte[] data, final Camera camera) {
-        final Size previewSize = camera.getParameters().getPreviewSize();
-        onPreviewFrame(data, previewSize.width, previewSize.height);
-    }
+
 
     public void onPreviewFrame(final byte[] data, final int width, final int height) {
         if (glRgbBuffer == null) {
             glRgbBuffer = IntBuffer.allocate(width * height);
         }
         if (runOnDraw.isEmpty()) {
-            runOnDraw(new Runnable() {
-                @Override
-                public void run() {
-                    GPUImageNativeLibrary.YUVtoRBGA(data, width, height, glRgbBuffer.array());
-                    glTextureId = OpenGlUtils.loadTexture(glRgbBuffer, width, height, glTextureId);
+            runOnDraw(() -> {
+                GPUImageNativeLibrary.YUVtoRBGA(data, width, height, glRgbBuffer.array());
+                glTextureId = OpenGlUtils.loadTexture(glRgbBuffer, width, height, glTextureId);
 
-                    if (imageWidth != width) {
-                        imageWidth = width;
-                        imageHeight = height;
-                        adjustImageScaling();
-                    }
+                if (imageWidth != width) {
+                    imageWidth = width;
+                    imageHeight = height;
+                    adjustImageScaling();
                 }
             });
         }
     }
+
 
     public void setUpSurfaceTexture(final Camera camera) {
         runOnDraw(new Runnable() {
@@ -187,13 +176,6 @@ public class GPUImageRenderer implements GLSurfaceView.Renderer, GLTextureView.R
                 int[] textures = new int[1];
                 GLES20.glGenTextures(1, textures, 0);
                 surfaceTexture = new SurfaceTexture(textures[0]);
-                try {
-                    camera.setPreviewTexture(surfaceTexture);
-                    camera.setPreviewCallback(GPUImageRenderer.this);
-                    camera.startPreview();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
             }
         });
     }
@@ -237,32 +219,28 @@ public class GPUImageRenderer implements GLSurfaceView.Renderer, GLTextureView.R
             return;
         }
 
-        runOnDraw(new Runnable() {
-
-            @Override
-            public void run() {
-                Bitmap resizedBitmap = null;
-                if (bitmap.getWidth() % 2 == 1) {
-                    resizedBitmap = Bitmap.createBitmap(bitmap.getWidth() + 1, bitmap.getHeight(),
-                            Bitmap.Config.ARGB_8888);
-                    resizedBitmap.setDensity(bitmap.getDensity());
-                    Canvas can = new Canvas(resizedBitmap);
-                    can.drawARGB(0x00, 0x00, 0x00, 0x00);
-                    can.drawBitmap(bitmap, 0, 0, null);
-                    addedPadding = 1;
-                } else {
-                    addedPadding = 0;
-                }
-
-                glTextureId = OpenGlUtils.loadTexture(
-                        resizedBitmap != null ? resizedBitmap : bitmap, glTextureId, recycle);
-                if (resizedBitmap != null) {
-                    resizedBitmap.recycle();
-                }
-                imageWidth = bitmap.getWidth();
-                imageHeight = bitmap.getHeight();
-                adjustImageScaling();
+        runOnDraw(() -> {
+            Bitmap resizedBitmap = null;
+            if (bitmap.getWidth() % 2 == 1) {
+                resizedBitmap = Bitmap.createBitmap(bitmap.getWidth() + 1, bitmap.getHeight(),
+                        Bitmap.Config.ARGB_8888);
+                resizedBitmap.setDensity(bitmap.getDensity());
+                Canvas can = new Canvas(resizedBitmap);
+                can.drawARGB(0x00, 0x00, 0x00, 0x00);
+                can.drawBitmap(bitmap, 0, 0, null);
+                addedPadding = 1;
+            } else {
+                addedPadding = 0;
             }
+
+            glTextureId = OpenGlUtils.loadTexture(
+                    resizedBitmap != null ? resizedBitmap : bitmap, glTextureId, recycle);
+            if (resizedBitmap != null) {
+                resizedBitmap.recycle();
+            }
+            imageWidth = bitmap.getWidth();
+            imageHeight = bitmap.getHeight();
+            adjustImageScaling();
         });
     }
 

@@ -7,7 +7,7 @@ android {
     compileSdk = 34
     namespace = "jp.co.cyberagent.android.gpuimage"
     defaultConfig {
-        minSdk = 26
+        minSdk = 27
         lint.targetSdk = 34
         ndk.abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
 
@@ -41,7 +41,8 @@ android {
 }
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(projects.gpuv)
+    implementation(libs.timber)
+    implementation(projects.opencv)
 }
 
 //val bintrayRepo = "maven"

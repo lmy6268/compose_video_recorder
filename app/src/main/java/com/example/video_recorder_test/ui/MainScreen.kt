@@ -48,7 +48,10 @@ val permissions = arrayOf(
     Manifest.permission.CAMERA,
     Manifest.permission.RECORD_AUDIO,
 ).run {
-    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU) this + arrayOf()
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) this + arrayOf(
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE
+    )
     else this
 }
 

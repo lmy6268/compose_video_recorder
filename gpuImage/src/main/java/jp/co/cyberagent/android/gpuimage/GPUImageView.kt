@@ -109,6 +109,7 @@ class GPUImageView : FrameLayout {
         gpuImage.updatePreviewFrame(data, width, height)
     }
 
+
     fun setBackgroundColor(red: Float, green: Float, blue: Float) {
         gpuImage.setBackgroundColor(red, green, blue)
     }
@@ -157,13 +158,12 @@ class GPUImageView : FrameLayout {
         gpuImage.setImage(file)
     }
 
-    fun requestRender() {
+    private fun requestRender() {
         when (surfaceView) {
             is GLSurfaceView -> (surfaceView as GLSurfaceView).requestRender()
             is GLTextureView -> (surfaceView as GLTextureView).requestRender()
         }
     }
-
 
 
     fun capture(): Bitmap {

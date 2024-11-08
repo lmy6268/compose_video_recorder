@@ -125,7 +125,7 @@ Java_jp_co_cyberagent_android_gpuimage_GPUImageNativeLibrary_YUVtoARBG(JNIEnv *e
 
 JNIEXPORT void JNICALL
 Java_jp_co_cyberagent_android_gpuimage_GPUImageNativeLibrary_adjustBitmap(JNIEnv *jenv, jclass thiz,
-                                                                       jobject src) {
+                                                                          jobject src) {
     unsigned char *srcByteBuffer;
     int result = 0;
     int i, j;
@@ -155,4 +155,66 @@ Java_jp_co_cyberagent_android_gpuimage_GPUImageNativeLibrary_adjustBitmap(JNIEnv
         }
     }
     AndroidBitmap_unlockPixels(jenv, src);
+}
+
+JNIEXPORT void JNICALL
+Java_jp_co_cyberagent_android_gpuimage_GPUImageNativeLibrary_YUVtoRBGAWithRotation(JNIEnv *env, jobject obj,
+                                                                       jbyteArray yuv420sp,
+                                                                       jint width, jint height,
+                                                                       jintArray rgbOut,
+                                                                       jint rotation) {
+    int sz = width * height;
+    int Y, Cr = 0, Cb = 0;
+    int R, G, B;
+    int cOff;
+
+    jint *rgbData = (jint *)(*env)->GetPrimitiveArrayCritical(env, rgbOut, 0);
+    jbyte *yuv = (jbyte *)(*env)->GetPrimitiveArrayCritical(env, yuv420sp, 0);
+
+    for (int j = 0; j < height; j++) {
+        int pixPtr = j * width;
+        int jDiv2 = j >> 1;
+
+        for (int i = 0; i < width; i++) {
+            Y = yuv[pixPtr];
+            if (Y < 0) Y += 255;
+
+            if ((i & 0x1) == 0) {
+                cOff = sz + jDiv2 * width + (i >> 1) * 2;
+                Cb = yuv[cOff];
+                if (Cb < 0) Cb += 127; else Cb -= 128;
+                Cr = yuv[cOff + 1];
+                if (Cr < 0) Cr += 127; else Cr -= 128;
+            }
+
+            // YUV to RGB conversion (ITU-R BT.601 standard)
+            Y = Y + (Y >> 3) + (Y >> 5) + (Y >> 7);
+            R = Y + (Cr << 1) + (Cr >> 6);
+            G = Y - Cb + (Cb >> 3) + (Cb >> 4) - (Cr >> 1) + (Cr >> 3);
+            B = Y + Cb + (Cb >> 1) + (Cb >> 4) + (Cb >> 5);
+
+            // Clamp RGB values
+            if (R < 0) R = 0; else if (R > 255) R = 255;
+            if (G < 0) G = 0; else if (G > 255) G = 255;
+            if (B < 0) B = 0; else if (B > 255) B = 255;
+
+            // Determine where to store the pixel in the output array based on rotation
+            int destIdx;
+            if (rotation == 90) {
+                destIdx = (width - 1 - i) * height + j;
+            } else if (rotation == 180) {
+                destIdx = (height - 1 - j) * width + (width - 1 - i);
+            } else if (rotation == 270) {
+                destIdx = i * height + (height - 1 - j);
+            } else {
+                destIdx = pixPtr; // No rotation
+            }
+
+            rgbData[destIdx] = 0xff000000 | (R << 16) | (G << 8) | B;
+            pixPtr++;
+        }
+    }
+
+    (*env)->ReleasePrimitiveArrayCritical(env, rgbOut, rgbData, 0);
+    (*env)->ReleasePrimitiveArrayCritical(env, yuv420sp, yuv, 0);
 }

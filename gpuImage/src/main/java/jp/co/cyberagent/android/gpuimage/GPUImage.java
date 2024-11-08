@@ -238,6 +238,7 @@ public class GPUImage {
         renderer.onPreviewFrame(data, width, height);
     }
 
+
     /**
      * This sets the scale type of GPUImage. This has to be run before setting the image.
      * If image is set and scale type changed, image needs to be reset.
@@ -259,7 +260,7 @@ public class GPUImage {
      * @return array with width and height of bitmap image
      */
     public int[] getScaleSize() {
-        return new int[] {scaleWidth, scaleHeight};
+        return new int[]{scaleWidth, scaleHeight};
     }
 
     /**

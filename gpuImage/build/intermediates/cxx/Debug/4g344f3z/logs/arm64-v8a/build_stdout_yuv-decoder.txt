@@ -1,2 +1,0 @@
-ninja: Entering directory `/Users/kyuyeonlee/kyuyeon_studies/android_native_development/video_recorder_test/gpuImage/.cxx/Debug/4g344f3z/arm64-v8a'
-ninja: no work to do.

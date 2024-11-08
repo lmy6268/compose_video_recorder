@@ -60,6 +60,7 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 android-application = { id = "com.android.application", version.ref = "agp" }
 jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 google-devtool-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
 dagger-hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 [bundles]
 cameraX = ["cameraX-core", "cameraX-camera2", "cameraX-cameraExtensions", "cameraX-cameraView", "cameraX-lifeCycle"]
