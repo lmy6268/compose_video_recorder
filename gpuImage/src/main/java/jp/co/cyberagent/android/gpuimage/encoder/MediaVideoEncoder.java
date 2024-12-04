@@ -20,7 +20,7 @@ package jp.co.cyberagent.android.gpuimage.encoder;
  *  limitations under the License.
  *
  * All files in the folder are under this Apache License, Version 2.0.
-*/
+ */
 
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -66,10 +66,9 @@ public class MediaVideoEncoder extends MediaEncoder {
 
     @Override
     public boolean frameAvailableSoon() {
-        boolean result;
-        if (result = super.frameAvailableSoon()) {
-            // mRenderHandler.draw(null);
-        }
+        boolean result = false;
+        super.frameAvailableSoon();
+        // mRenderHandler.draw(null);
         return result;
     }
 
@@ -137,13 +136,14 @@ public class MediaVideoEncoder extends MediaEncoder {
         if (!"US".equalsIgnoreCase(LocateManager.getInstance().getCountry())) {
             bpp = BPP_LOW;
         }*/
-        final int bitrate = (int)(BPP * FRAME_RATE * mWidth * mHeight);
+        final int bitrate = (int) (BPP * FRAME_RATE * mWidth * mHeight);
         Log.i(TAG, String.format("bitrate=%5.2f[Mbps]", bitrate / 1024f / 1024f));
         return bitrate;
     }
 
     /**
      * select the first codec that match a specific MIME type
+     *
      * @param mimeType
      * @return null if no codec matched
      */
@@ -151,18 +151,19 @@ public class MediaVideoEncoder extends MediaEncoder {
         if (DEBUG) Log.v(TAG, "selectVideoCodec:");
 
         // get the list of available codecs
-        final int numCodecs = MediaCodecList.getCodecCount();
-        for (int i = 0; i < numCodecs; i++) {
-            final MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
+
+        final MediaCodecInfo[] numCodecs = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
+        for (int i = 0; i < numCodecs.length; i++) {
+            final MediaCodecInfo codecInfo = numCodecs[i];
 
             if (!codecInfo.isEncoder()) {    // skipp decoder
                 continue;
             }
             // select first codec that match a specific MIME type and color format
             final String[] types = codecInfo.getSupportedTypes();
-            for (int j = 0; j < types.length; j++) {
-                if (types[j].equalsIgnoreCase(mimeType)) {
-                    if (DEBUG) Log.i(TAG, "codec:" + codecInfo.getName() + ",MIME=" + types[j]);
+            for (String type : types) {
+                if (type.equalsIgnoreCase(mimeType)) {
+                    if (DEBUG) Log.i(TAG, "codec:" + codecInfo.getName() + ",MIME=" + type);
                     final int format = selectColorFormat(codecInfo, mimeType);
                     if (format > 0) {
                         return codecInfo;
@@ -175,9 +176,10 @@ public class MediaVideoEncoder extends MediaEncoder {
 
     /**
      * select color format available on specific codec and we can use.
+     *
      * @return 0 if no colorFormat is matched
      */
-    protected static final int selectColorFormat(final MediaCodecInfo codecInfo, final String mimeType) {
+    protected static int selectColorFormat(final MediaCodecInfo codecInfo, final String mimeType) {
         if (DEBUG) Log.i(TAG, "selectColorFormat: ");
         int result = 0;
         final MediaCodecInfo.CodecCapabilities caps;
@@ -205,8 +207,9 @@ public class MediaVideoEncoder extends MediaEncoder {
      * color formats that we can use in this class
      */
     protected static int[] recognizedFormats;
+
     static {
-        recognizedFormats = new int[] {
+        recognizedFormats = new int[]{
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface,
 //            MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar,
 //            MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar,
@@ -215,7 +218,7 @@ public class MediaVideoEncoder extends MediaEncoder {
         };
     }
 
-    private static final boolean isRecognizedViewoFormat(final int colorFormat) {
+    private static boolean isRecognizedViewoFormat(final int colorFormat) {
         if (DEBUG) Log.i(TAG, "isRecognizedViewoFormat:colorFormat=" + colorFormat);
         final int n = recognizedFormats != null ? recognizedFormats.length : 0;
         for (int i = 0; i < n; i++) {

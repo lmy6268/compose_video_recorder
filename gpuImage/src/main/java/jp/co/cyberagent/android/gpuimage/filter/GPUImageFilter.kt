@@ -13,281 +13,230 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package jp.co.cyberagent.android.gpuimage.filter
 
-package jp.co.cyberagent.android.gpuimage.filter;
+import android.content.Context
+import android.graphics.PointF
+import android.opengl.GLES20
+import jp.co.cyberagent.android.gpuimage.util.OpenGlUtils
+import timber.log.Timber
+import java.io.InputStream
+import java.nio.FloatBuffer
+import java.util.LinkedList
+import java.util.Scanner
 
-import android.content.Context;
-import android.content.res.AssetManager;
-import android.graphics.PointF;
-import android.opengl.GLES20;
+open class GPUImageFilter @JvmOverloads constructor(
+    private val vertexShader: String = NO_FILTER_VERTEX_SHADER,
+    private val fragmentShader: String = NO_FILTER_FRAGMENT_SHADER
+) {
+    private val runOnDraw = LinkedList<Runnable>()
+    var program: Int = 0
+        private set
+    private var attribPosition: Int = 0
+        private set
+    private var uniformTexture: Int = 0
+        private set
+    private var attribTextureCoordinate: Int = 0
+        private set
+    var outputWidth: Int = 0
+        private set
+    var outputHeight: Int = 0
+        private set
+    var isInitialized: Boolean = false
+        private set
 
-import java.io.InputStream;
-import java.nio.FloatBuffer;
-import java.util.LinkedList;
-
-import jp.co.cyberagent.android.gpuimage.util.OpenGlUtils;
-
-public class GPUImageFilter {
-    public static final String NO_FILTER_VERTEX_SHADER = "" +
-            "attribute vec4 position;\n" +
-            "attribute vec4 inputTextureCoordinate;\n" +
-            " \n" +
-            "varying vec2 textureCoordinate;\n" +
-            " \n" +
-            "void main()\n" +
-            "{\n" +
-            "    gl_Position = position;\n" +
-            "    textureCoordinate = inputTextureCoordinate.xy;\n" +
-            "}";
-    public static final String NO_FILTER_FRAGMENT_SHADER = "" +
-            "varying highp vec2 textureCoordinate;\n" +
-            " \n" +
-            "uniform sampler2D inputImageTexture;\n" +
-            " \n" +
-            "void main()\n" +
-            "{\n" +
-            "     gl_FragColor = texture2D(inputImageTexture, textureCoordinate);\n" +
-            "}";
-
-    private final LinkedList<Runnable> runOnDraw;
-    private final String vertexShader;
-    private final String fragmentShader;
-    private int glProgId;
-    private int glAttribPosition;
-    private int glUniformTexture;
-    private int glAttribTextureCoordinate;
-    private int outputWidth;
-    private int outputHeight;
-    private boolean isInitialized;
-
-    public GPUImageFilter() {
-        this(NO_FILTER_VERTEX_SHADER, NO_FILTER_FRAGMENT_SHADER);
+    private fun init() {
+        onInit()
+        onInitialized()
     }
 
-    public GPUImageFilter(final String vertexShader, final String fragmentShader) {
-        runOnDraw = new LinkedList<>();
-        this.vertexShader = vertexShader;
-        this.fragmentShader = fragmentShader;
+    open fun onInit() {
+        program = OpenGlUtils.loadProgram(vertexShader, fragmentShader)
+        attribPosition = GLES20.glGetAttribLocation(program, "position")
+        uniformTexture = GLES20.glGetUniformLocation(program, "inputImageTexture")
+        attribTextureCoordinate = GLES20.glGetAttribLocation(program, "inputTextureCoordinate")
+        isInitialized = true
     }
 
-    private final void init() {
-        onInit();
-        onInitialized();
+    open fun onInitialized() {
     }
 
-    public void onInit() {
-        glProgId = OpenGlUtils.loadProgram(vertexShader, fragmentShader);
-        glAttribPosition = GLES20.glGetAttribLocation(glProgId, "position");
-        glUniformTexture = GLES20.glGetUniformLocation(glProgId, "inputImageTexture");
-        glAttribTextureCoordinate = GLES20.glGetAttribLocation(glProgId, "inputTextureCoordinate");
-        isInitialized = true;
+    fun ifNeedInit() {
+        if (!isInitialized) init()
     }
 
-    public void onInitialized() {
+    fun destroy() {
+        isInitialized = false
+        GLES20.glDeleteProgram(program)
+        onDestroy()
     }
 
-    public void ifNeedInit() {
-        if (!isInitialized) init();
+    open fun onDestroy() {
     }
 
-    public final void destroy() {
-        isInitialized = false;
-        GLES20.glDeleteProgram(glProgId);
-        onDestroy();
+    open fun onOutputSizeChanged(width: Int, height: Int) {
+        outputWidth = width
+        outputHeight = height
     }
 
-    public void onDestroy() {
-    }
-
-    public void onOutputSizeChanged(final int width, final int height) {
-        outputWidth = width;
-        outputHeight = height;
-    }
-
-    public void onDraw(final int textureId, final FloatBuffer cubeBuffer,
-                       final FloatBuffer textureBuffer) {
-        GLES20.glUseProgram(glProgId);
-        runPendingOnDrawTasks();
+    open fun onDraw(
+        textureId: Int, cubeBuffer: FloatBuffer,
+        textureBuffer: FloatBuffer
+    ) {
+        GLES20.glUseProgram(program)
+        runPendingOnDrawTasks()
         if (!isInitialized) {
-            return;
+            return
         }
 
-        cubeBuffer.position(0);
-        GLES20.glVertexAttribPointer(glAttribPosition, 2, GLES20.GL_FLOAT, false, 0, cubeBuffer);
-        GLES20.glEnableVertexAttribArray(glAttribPosition);
-        textureBuffer.position(0);
-        GLES20.glVertexAttribPointer(glAttribTextureCoordinate, 2, GLES20.GL_FLOAT, false, 0,
-                textureBuffer);
-        GLES20.glEnableVertexAttribArray(glAttribTextureCoordinate);
+        cubeBuffer.position(0)
+        GLES20.glVertexAttribPointer(attribPosition, 2, GLES20.GL_FLOAT, false, 0, cubeBuffer)
+        GLES20.glEnableVertexAttribArray(attribPosition)
+        textureBuffer.position(0)
+        GLES20.glVertexAttribPointer(
+            attribTextureCoordinate, 2, GLES20.GL_FLOAT, false, 0,
+            textureBuffer
+        )
+        GLES20.glEnableVertexAttribArray(attribTextureCoordinate)
         if (textureId != OpenGlUtils.NO_TEXTURE) {
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId);
-            GLES20.glUniform1i(glUniformTexture, 0);
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
+            GLES20.glUniform1i(uniformTexture, 0)
         }
-        onDrawArraysPre();
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
-        GLES20.glDisableVertexAttribArray(glAttribPosition);
-        GLES20.glDisableVertexAttribArray(glAttribTextureCoordinate);
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+        onDrawArraysPre()
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        GLES20.glDisableVertexAttribArray(attribPosition)
+        GLES20.glDisableVertexAttribArray(attribTextureCoordinate)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
     }
 
-    protected void onDrawArraysPre() {
+    protected open fun onDrawArraysPre() {
     }
 
-    protected void runPendingOnDrawTasks() {
-        synchronized (runOnDraw) {
+    protected fun runPendingOnDrawTasks() {
+        Timber.tag("runPendingOnDrawTasks()").d("%s", runOnDraw.toString());
+        //여기서 로그를 찍으면, runOnDraw에서 입력한 데이터가 보이지 않음.
+        synchronized(runOnDraw) {
             while (!runOnDraw.isEmpty()) {
-                runOnDraw.removeFirst().run();
+                val item = runOnDraw.removeFirst()
+                item.run()
             }
         }
     }
 
-    public boolean isInitialized() {
-        return isInitialized;
-    }
-
-    public int getOutputWidth() {
-        return outputWidth;
-    }
-
-    public int getOutputHeight() {
-        return outputHeight;
-    }
-
-    public int getProgram() {
-        return glProgId;
-    }
-
-    public int getAttribPosition() {
-        return glAttribPosition;
-    }
-
-    public int getAttribTextureCoordinate() {
-        return glAttribTextureCoordinate;
-    }
-
-    public int getUniformTexture() {
-        return glUniformTexture;
-    }
-
-    protected void setInteger(final int location, final int intValue) {
-        runOnDraw(new Runnable() {
-            @Override
-            public void run() {
-                ifNeedInit();
-                GLES20.glUniform1i(location, intValue);
-            }
-        });
-    }
-
-    protected void setFloat(final int location, final float floatValue) {
-        runOnDraw(new Runnable() {
-            @Override
-            public void run() {
-                ifNeedInit();
-                GLES20.glUniform1f(location, floatValue);
-            }
-        });
-    }
-
-    protected void setFloatVec2(final int location, final float[] arrayValue) {
-        runOnDraw(new Runnable() {
-            @Override
-            public void run() {
-                ifNeedInit();
-                GLES20.glUniform2fv(location, 1, FloatBuffer.wrap(arrayValue));
-            }
-        });
-    }
-
-    protected void setFloatVec3(final int location, final float[] arrayValue) {
-        runOnDraw(new Runnable() {
-            @Override
-            public void run() {
-                ifNeedInit();
-                GLES20.glUniform3fv(location, 1, FloatBuffer.wrap(arrayValue));
-            }
-        });
-    }
-
-    protected void setFloatVec4(final int location, final float[] arrayValue) {
-        runOnDraw(new Runnable() {
-            @Override
-            public void run() {
-                ifNeedInit();
-                GLES20.glUniform4fv(location, 1, FloatBuffer.wrap(arrayValue));
-            }
-        });
-    }
-
-    protected void setFloatArray(final int location, final float[] arrayValue) {
-        runOnDraw(new Runnable() {
-            @Override
-            public void run() {
-                ifNeedInit();
-                GLES20.glUniform1fv(location, arrayValue.length, FloatBuffer.wrap(arrayValue));
-            }
-        });
-    }
-
-    protected void setPoint(final int location, final PointF point) {
-        runOnDraw(new Runnable() {
-            @Override
-            public void run() {
-                ifNeedInit();
-                float[] vec2 = new float[2];
-                vec2[0] = point.x;
-                vec2[1] = point.y;
-                GLES20.glUniform2fv(location, 1, vec2, 0);
-            }
-        });
-    }
-
-    protected void setUniformMatrix3f(final int location, final float[] matrix) {
-        runOnDraw(new Runnable() {
-
-            @Override
-            public void run() {
-                ifNeedInit();
-                GLES20.glUniformMatrix3fv(location, 1, false, matrix, 0);
-            }
-        });
-    }
-
-    protected void setUniformMatrix4f(final int location, final float[] matrix) {
-        runOnDraw(new Runnable() {
-
-            @Override
-            public void run() {
-                ifNeedInit();
-                GLES20.glUniformMatrix4fv(location, 1, false, matrix, 0);
-            }
-        });
-    }
-
-    protected void runOnDraw(final Runnable runnable) {
-        synchronized (runOnDraw) {
-            runOnDraw.addLast(runnable);
+    protected fun setInteger(location: Int, intValue: Int) {
+        runOnDraw {
+            ifNeedInit()
+            GLES20.glUniform1i(location, intValue)
         }
     }
 
-    public static String loadShader(String file, Context context) {
-        try {
-            AssetManager assetManager = context.getAssets();
-            InputStream ims = assetManager.open(file);
-
-            String re = convertStreamToString(ims);
-            ims.close();
-            return re;
-        } catch (Exception e) {
-            e.printStackTrace();
+    fun setFloat(location: Int, floatValue: Float) {
+        runOnDraw {
+            ifNeedInit()
+            GLES20.glUniform1f(location, floatValue)
         }
-
-        return "";
     }
 
-    public static String convertStreamToString(java.io.InputStream is) {
-        java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
-        return s.hasNext() ? s.next() : "";
+    protected fun setFloatVec2(location: Int, arrayValue: FloatArray?) {
+        runOnDraw {
+            ifNeedInit()
+            GLES20.glUniform2fv(location, 1, FloatBuffer.wrap(arrayValue))
+        }
+    }
+
+    protected fun setFloatVec3(location: Int, arrayValue: FloatArray?) {
+        runOnDraw {
+            ifNeedInit()
+            GLES20.glUniform3fv(location, 1, FloatBuffer.wrap(arrayValue))
+        }
+    }
+
+    protected fun setFloatVec4(location: Int, arrayValue: FloatArray?) {
+        runOnDraw {
+            ifNeedInit()
+            GLES20.glUniform4fv(location, 1, FloatBuffer.wrap(arrayValue))
+        }
+    }
+
+    protected fun setFloatArray(location: Int, arrayValue: FloatArray) {
+        runOnDraw {
+            ifNeedInit()
+            GLES20.glUniform1fv(location, arrayValue.size, FloatBuffer.wrap(arrayValue))
+        }
+    }
+
+    protected fun setPoint(location: Int, point: PointF) {
+        runOnDraw {
+            ifNeedInit()
+            val vec2 = FloatArray(2)
+            vec2[0] = point.x
+            vec2[1] = point.y
+            GLES20.glUniform2fv(location, 1, vec2, 0)
+        }
+    }
+
+    protected fun setUniformMatrix3f(location: Int, matrix: FloatArray?) {
+        runOnDraw {
+            ifNeedInit()
+            GLES20.glUniformMatrix3fv(location, 1, false, matrix, 0)
+        }
+    }
+
+    protected fun setUniformMatrix4f(location: Int, matrix: FloatArray?) {
+        runOnDraw {
+            ifNeedInit()
+            GLES20.glUniformMatrix4fv(location, 1, false, matrix, 0)
+        }
+    }
+
+    protected fun runOnDraw(runnable: Runnable) {
+        synchronized(runOnDraw) {
+            //여기까지는 진행이 됨.
+            runOnDraw.add(runnable)
+        }
+    }
+
+    companion object {
+        const val NO_FILTER_VERTEX_SHADER: String = "" +
+                "attribute vec4 position;\n" +
+                "attribute vec4 inputTextureCoordinate;\n" +
+                " \n" +
+                "varying vec2 textureCoordinate;\n" +
+                " \n" +
+                "void main()\n" +
+                "{\n" +
+                "    gl_Position = position;\n" +
+                "    textureCoordinate = inputTextureCoordinate.xy;\n" +
+                "}"
+        const val NO_FILTER_FRAGMENT_SHADER: String = "" +
+                "varying highp vec2 textureCoordinate;\n" +
+                " \n" +
+                "uniform sampler2D inputImageTexture;\n" +
+                " \n" +
+                "void main()\n" +
+                "{\n" +
+                "     gl_FragColor = texture2D(inputImageTexture, textureCoordinate);\n" +
+                "}"
+
+        fun loadShader(file: String?, context: Context): String {
+            try {
+                val assetManager = context.assets
+                val ims = assetManager.open(file!!)
+
+                val re = convertStreamToString(ims)
+                ims.close()
+                return re
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            return ""
+        }
+
+        private fun convertStreamToString(`is`: InputStream?): String {
+            val s = Scanner(`is`).useDelimiter("\\A")
+            return if (s.hasNext()) s.next() else ""
+        }
     }
 }

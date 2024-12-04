@@ -1,167 +1,166 @@
-package jp.co.cyberagent.android.gpuimage.filter;
+package jp.co.cyberagent.android.gpuimage.filter
 
-import android.opengl.EGL14;
+import android.opengl.EGL14
+import android.util.Log
+import jp.co.cyberagent.android.gpuimage.encoder.EglCore
+import jp.co.cyberagent.android.gpuimage.encoder.MediaAudioEncoder
+import jp.co.cyberagent.android.gpuimage.encoder.MediaEncoder
+import jp.co.cyberagent.android.gpuimage.encoder.MediaEncoder.MediaEncoderListener
+import jp.co.cyberagent.android.gpuimage.encoder.MediaMuxerWrapper
+import jp.co.cyberagent.android.gpuimage.encoder.MediaVideoEncoder
+import jp.co.cyberagent.android.gpuimage.encoder.WindowSurface
+import timber.log.Timber
+import java.io.FileDescriptor
+import java.io.IOException
+import java.nio.FloatBuffer
+import javax.microedition.khronos.egl.EGL10
+import javax.microedition.khronos.egl.EGLContext
+import javax.microedition.khronos.egl.EGLDisplay
+import javax.microedition.khronos.egl.EGLSurface
 
-import java.io.FileDescriptor;
-import java.io.IOException;
-import java.nio.FloatBuffer;
+class GPUImageMovieWriter : GPUImageFilter() {
+    private var mMuxer: MediaMuxerWrapper? = null
+    private var mVideoEncoder: MediaVideoEncoder? = null
+    private var mAudioEncoder: MediaAudioEncoder? = null
+    private var mCodecInput: WindowSurface? = null
 
-import javax.microedition.khronos.egl.EGL10;
-import javax.microedition.khronos.egl.EGLContext;
-import javax.microedition.khronos.egl.EGLDisplay;
-import javax.microedition.khronos.egl.EGLSurface;
+    private var mEGLScreenSurface: EGLSurface? = null
+    private var mEGL: EGL10? = null
+    private var mEGLDisplay: EGLDisplay? = null
+    private var mEGLContext: EGLContext? = null
+    private var mEGLCore: EglCore? = null
 
-import jp.co.cyberagent.android.gpuimage.encoder.EglCore;
-import jp.co.cyberagent.android.gpuimage.encoder.MediaAudioEncoder;
-import jp.co.cyberagent.android.gpuimage.encoder.MediaEncoder;
-import jp.co.cyberagent.android.gpuimage.encoder.MediaMuxerWrapper;
-import jp.co.cyberagent.android.gpuimage.encoder.MediaVideoEncoder;
-import jp.co.cyberagent.android.gpuimage.encoder.WindowSurface;
-import timber.log.Timber;
+    private var mIsRecording = false
 
-public class GPUImageMovieWriter extends GPUImageFilter {
-    private MediaMuxerWrapper mMuxer;
-    private MediaVideoEncoder mVideoEncoder;
-    private MediaAudioEncoder mAudioEncoder;
-    private WindowSurface mCodecInput;
-
-    private EGLSurface mEGLScreenSurface;
-    private EGL10 mEGL;
-    private EGLDisplay mEGLDisplay;
-    private EGLContext mEGLContext;
-    private EglCore mEGLCore;
-
-    private boolean mIsRecording = false;
-
-    @Override
-    public void onInit() {
-        super.onInit();
-        mEGL = (EGL10) EGLContext.getEGL();
-        mEGLDisplay = mEGL.eglGetCurrentDisplay();
-        mEGLContext = mEGL.eglGetCurrentContext();
-        mEGLScreenSurface = mEGL.eglGetCurrentSurface(EGL10.EGL_DRAW);
+    override fun onInit() {
+        super.onInit()
+        mEGL = EGLContext.getEGL() as EGL10
+        mEGLDisplay = mEGL!!.eglGetCurrentDisplay()
+        mEGLContext = mEGL!!.eglGetCurrentContext()
+        mEGLScreenSurface = mEGL!!.eglGetCurrentSurface(EGL10.EGL_DRAW)
     }
 
-    @Override
-    public void onDraw(int textureId, FloatBuffer cubeBuffer, FloatBuffer textureBuffer) {
+    override fun onDraw(textureId: Int, cubeBuffer: FloatBuffer, textureBuffer: FloatBuffer) {
         // Draw on screen surface
-        super.onDraw(textureId, cubeBuffer, textureBuffer);
+        super.onDraw(textureId, cubeBuffer, textureBuffer)
 
         if (mIsRecording) {
-            Timber.tag("On Recording").d("on Going");
             // create encoder surface
             if (mCodecInput == null) {
-                mEGLCore = new EglCore(EGL14.eglGetCurrentContext(), EglCore.FLAG_RECORDABLE);
-                mCodecInput = new WindowSurface(mEGLCore, mVideoEncoder.getSurface(), false);
+                mEGLCore = EglCore(EGL14.eglGetCurrentContext(), EglCore.FLAG_RECORDABLE)
+                mCodecInput = WindowSurface(mEGLCore, mVideoEncoder!!.surface, false)
             }
 
             // Draw on encoder surface
-            mCodecInput.makeCurrent();
-            super.onDraw(textureId, cubeBuffer, textureBuffer);
-            mCodecInput.swapBuffers();
-            mVideoEncoder.frameAvailableSoon();
+            mCodecInput!!.makeCurrent()
+            super.onDraw(textureId, cubeBuffer, textureBuffer)
+            mCodecInput!!.swapBuffers()
+            mVideoEncoder!!.frameAvailableSoon()
         }
 
         // Make screen surface be current surface
-        mEGL.eglMakeCurrent(mEGLDisplay, mEGLScreenSurface, mEGLScreenSurface, mEGLContext);
+        mEGL!!.eglMakeCurrent(mEGLDisplay, mEGLScreenSurface, mEGLScreenSurface, mEGLContext)
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        releaseEncodeSurface();
+    override fun onDestroy() {
+        super.onDestroy()
+        releaseEncodeSurface()
     }
 
-    public void startRecording(final String outputPath, final int width, final int height) {
-        runOnDraw(() -> {
+    fun startRecording(outputPath: String?, width: Int, height: Int) {
+        runOnDraw {
             if (mIsRecording) {
-                return;
+                return@runOnDraw
             }
-
             try {
-                mMuxer = new MediaMuxerWrapper(outputPath);
+                mMuxer = MediaMuxerWrapper(outputPath)
 
                 // for video capturing
-                mVideoEncoder = new MediaVideoEncoder(mMuxer, mMediaEncoderListener, width, height);
+                mVideoEncoder = MediaVideoEncoder(mMuxer, mMediaEncoderListener, width, height)
                 // for audio capturing
-                mAudioEncoder = new MediaAudioEncoder(mMuxer, mMediaEncoderListener);
+                mAudioEncoder = MediaAudioEncoder(mMuxer, mMediaEncoderListener)
 
-                mMuxer.prepare();
-                mMuxer.startRecording();
+                mMuxer!!.prepare()
+                mMuxer!!.startRecording()
 
 
-                mIsRecording = true;
-            } catch (IOException e) {
-                e.printStackTrace();
+                mIsRecording = true
+            } catch (e: IOException) {
+                e.printStackTrace()
             }
-        });
+        }
     }
 
-    public void startRecording(final FileDescriptor fd, final int width, final int height) {
-        runOnDraw(() -> {
+    fun startRecording(fd: FileDescriptor?, width: Int, height: Int) {
+        Timber.tag(TAG).d("called startRecording")
+        runOnDraw {
+            Timber.tag(TAG).d("on start")
             if (mIsRecording) {
-                return;
+                return@runOnDraw
             }
-
             try {
-                mMuxer = new MediaMuxerWrapper(fd);
+                Timber.tag(TAG).d("on start")
+                Log.d(TAG, "on Start")
+                mMuxer = MediaMuxerWrapper(fd)
 
                 // for video capturing
-                mVideoEncoder = new MediaVideoEncoder(mMuxer, mMediaEncoderListener, width, height);
+                mVideoEncoder = MediaVideoEncoder(mMuxer, mMediaEncoderListener, width, height)
                 // for audio capturing
-                mAudioEncoder = new MediaAudioEncoder(mMuxer, mMediaEncoderListener);
+                mAudioEncoder = MediaAudioEncoder(mMuxer, mMediaEncoderListener)
 
-                mMuxer.prepare();
-                mMuxer.startRecording();
+                mMuxer!!.prepare()
+                mMuxer!!.startRecording()
 
-
-                mIsRecording = true;
-            } catch (IOException e) {
-                Timber.tag("Start Recording").e(e);
+                mIsRecording = true
+            } catch (e: IOException) {
+                Log.e(TAG, e.message!!)
+                Timber.tag(TAG).e(e)
             }
-        });
+        }
     }
 
-    public void stopRecording() {
-        runOnDraw(() -> {
-            Timber.tag("Stop Recording").d("true");
+    fun stopRecording() {
+        runOnDraw {
+            Log.d(TAG, "onStop")
+            Timber.tag(TAG).d("on stop")
             if (!mIsRecording) {
-                return;
+                return@runOnDraw
             }
 
-            mMuxer.stopRecording();
-            mIsRecording = false;
-            releaseEncodeSurface();
-        });
+            mMuxer!!.stopRecording()
+            mIsRecording = false
+            releaseEncodeSurface()
+        }
     }
 
-    private void releaseEncodeSurface() {
+    private fun releaseEncodeSurface() {
         if (mEGLCore != null) {
-            mEGLCore.makeNothingCurrent();
-            mEGLCore.release();
-            mEGLCore = null;
+            mEGLCore!!.makeNothingCurrent()
+            mEGLCore!!.release()
+            mEGLCore = null
         }
 
         if (mCodecInput != null) {
-            mCodecInput.release();
-            mCodecInput = null;
+            mCodecInput!!.release()
+            mCodecInput = null
         }
     }
 
     /**
      * callback methods from encoder
      */
-    private final MediaEncoder.MediaEncoderListener mMediaEncoderListener = new MediaEncoder.MediaEncoderListener() {
-        @Override
-        public void onPrepared(final MediaEncoder encoder) {
+    private val mMediaEncoderListener: MediaEncoderListener = object : MediaEncoderListener {
+        override fun onPrepared(encoder: MediaEncoder) {
         }
 
-        @Override
-        public void onStopped(final MediaEncoder encoder) {
+        override fun onStopped(encoder: MediaEncoder) {
         }
 
-        @Override
-        public void onMuxerStopped() {
+        override fun onMuxerStopped() {
         }
-    };
+    }
+
+    companion object {
+        private const val TAG = "Recording State"
+    }
 }

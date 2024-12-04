@@ -46,19 +46,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.video_recorder_test.R
 import jp.co.cyberagent.android.gpuimage.GPUImageView
 import jp.co.cyberagent.android.gpuimage.GPUImageView.Companion.RENDERMODE_WHEN_DIRTY
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageFilter
 import jp.co.cyberagent.android.gpuimage.filter.GPUImageFilterGroup
 import jp.co.cyberagent.android.gpuimage.filter.GPUImageLookupFilter
 import jp.co.cyberagent.android.gpuimage.filter.GPUImageMovieWriter
-import jp.co.cyberagent.android.gpuimage.filter.GPUImageTwoInputFilter
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.callbackFlow
-import timber.log.Timber
-import java.io.File
 import java.io.FileDescriptor
 import java.util.Locale
 
-fun initMediaMuxer(context: Context, fileName: String): FileDescriptor? {
+fun getFileDescriptor(context: Context, fileName: String): FileDescriptor? {
 
     // Define content values for the new video entry
     val values = ContentValues().apply {
@@ -76,8 +74,7 @@ fun initMediaMuxer(context: Context, fileName: String): FileDescriptor? {
 
     return videoUri?.let { uri ->
         // Open a file descriptor from the Uri
-        val parcelFileDescriptor = context.contentResolver.openFileDescriptor(uri, "rw")
-        parcelFileDescriptor?.fileDescriptor
+        context.contentResolver.openFileDescriptor(uri, "rw")?.fileDescriptor
     }
 }
 
@@ -106,7 +103,7 @@ fun CameraViewFinder(
     }
 
     var currentMode by remember { mutableStateOf("Photo") }
-    val writer = remember { GPUImageMovieWriter() }
+    var writer by remember { mutableStateOf(GPUImageMovieWriter()) }
     var cnt by remember {
         mutableIntStateOf(0)
     }
@@ -144,40 +141,19 @@ fun CameraViewFinder(
             )
         }
     }
-
-
-
-
-    LaunchedEffect(isRecording) {
-
-        if (isRecording) {
-            initMediaMuxer(context, "movie$cnt.mp4")?.let {
-                writer.startRecording(
-                    it,
-                    1080,
-                    1920
-                )
-                cnt++
-            } ?: run {
-                isRecording = false
-            }
-        } else writer.stopRecording()
-
-    }
-    val gpuImageView = remember {
-        GPUImageView(context).apply {
-            setRenderMode(RENDERMODE_WHEN_DIRTY)
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            setBackgroundColor(android.graphics.Color.WHITE)
-        }
+    var applied by remember {
+        mutableStateOf(GPUImageFilterGroup().apply { GPUImageFilter() })
     }
 
-    LaunchedEffect(frame) {
-
+    var currentVideo by remember {
+        mutableStateOf<GPUImageMovieWriter?>(null)
     }
+
+    var gpuImageView by remember {
+        mutableStateOf<GPUImageView?>(null)
+    }
+
+
 
 
 
@@ -203,7 +179,6 @@ fun CameraViewFinder(
                 )
 
 
-
                 AndroidView(
                     factory = {
                         GPUImageView(it).apply {
@@ -213,14 +188,14 @@ fun CameraViewFinder(
                                 ViewGroup.LayoutParams.MATCH_PARENT
                             )
                             setBackgroundColor(android.graphics.Color.WHITE)
+                            gpuImageView = this
                         }
                     },
                     update = {
                         it.apply {
-                            setFilter(GPUImageFilterGroup().apply {
+                            applied = GPUImageFilterGroup(applied.mergedFilters).apply {
                                 addFilter(filter)
-                                if (currentMode == "Video") addFilter(writer)
-                            })
+                            }
                             frame?.run {
                                 setImage(data)
                             }
@@ -237,8 +212,19 @@ fun CameraViewFinder(
                 ) {
                     Button(
                         onClick = {
-                            if (currentMode == "Video") isRecording = !isRecording
-                            else viewModel.takePhoto()
+                            if (currentMode == "Video") {
+                                if (!isRecording) {
+                                    currentVideo = GPUImageMovieWriter().apply {
+                                        startRecording(
+                                            getFileDescriptor(context, "${System.currentTimeMillis()}.mp4"),
+                                            1080,
+                                            1920
+                                        )
+                                    }
+                                    applied.addFilter(filter)
+                                } else currentVideo?.stopRecording()
+                                isRecording = !isRecording
+                            } else viewModel.takePhoto()
                         },
                         modifier = Modifier
                             .height(100.dp)
