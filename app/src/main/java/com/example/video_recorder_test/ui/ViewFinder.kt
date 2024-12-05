@@ -103,10 +103,6 @@ fun CameraViewFinder(
     }
 
     var currentMode by remember { mutableStateOf("Photo") }
-    var writer by remember { mutableStateOf(GPUImageMovieWriter()) }
-    var cnt by remember {
-        mutableIntStateOf(0)
-    }
     val targetRotation by remember {
         callbackFlow {
             val listener = object : OrientationEventListener(context) {
@@ -141,20 +137,16 @@ fun CameraViewFinder(
             )
         }
     }
+    val video = remember { GPUImageMovieWriter() }
     var applied by remember {
-        mutableStateOf(GPUImageFilterGroup().apply { GPUImageFilter() })
+        mutableStateOf(GPUImageFilterGroup())
     }
 
-    var currentVideo by remember {
-        mutableStateOf<GPUImageMovieWriter?>(null)
-    }
+
 
     var gpuImageView by remember {
         mutableStateOf<GPUImageView?>(null)
     }
-
-
-
 
 
     AnimatedContent(targetState = showCaptureImage, label = "프리뷰 화면") { value ->
@@ -189,13 +181,11 @@ fun CameraViewFinder(
                             )
                             setBackgroundColor(android.graphics.Color.WHITE)
                             gpuImageView = this
+                            setFilter(applied.apply { addFilter(filter);addFilter(video) })
                         }
                     },
                     update = {
                         it.apply {
-                            applied = GPUImageFilterGroup(applied.mergedFilters).apply {
-                                addFilter(filter)
-                            }
                             frame?.run {
                                 setImage(data)
                             }
@@ -214,15 +204,16 @@ fun CameraViewFinder(
                         onClick = {
                             if (currentMode == "Video") {
                                 if (!isRecording) {
-                                    currentVideo = GPUImageMovieWriter().apply {
-                                        startRecording(
-                                            getFileDescriptor(context, "${System.currentTimeMillis()}.mp4"),
-                                            1080,
-                                            1920
-                                        )
-                                    }
-                                    applied.addFilter(filter)
-                                } else currentVideo?.stopRecording()
+                                    video.startRecording(
+                                        getFileDescriptor(
+                                            context,
+                                            "${System.currentTimeMillis()}.mp4"
+                                        ),
+                                        1080,
+                                        1920
+                                    )
+                                    gpuImageView?.getGPUImage()
+                                } else video.stopRecording()
                                 isRecording = !isRecording
                             } else viewModel.takePhoto()
                         },
@@ -238,6 +229,10 @@ fun CameraViewFinder(
                             currentMode = when (currentMode) {
                                 "Photo" -> "Video"
                                 else -> "Photo"
+                            }
+                            if (isRecording) {
+                                isRecording = false
+                                video.stopRecording()
                             }
                             viewModel.changeMode(currentMode)
                         },

@@ -67,32 +67,7 @@ class GPUImageMovieWriter : GPUImageFilter() {
         releaseEncodeSurface()
     }
 
-    fun startRecording(outputPath: String?, width: Int, height: Int) {
-        runOnDraw {
-            if (mIsRecording) {
-                return@runOnDraw
-            }
-            try {
-                mMuxer = MediaMuxerWrapper(outputPath)
-
-                // for video capturing
-                mVideoEncoder = MediaVideoEncoder(mMuxer, mMediaEncoderListener, width, height)
-                // for audio capturing
-                mAudioEncoder = MediaAudioEncoder(mMuxer, mMediaEncoderListener)
-
-                mMuxer!!.prepare()
-                mMuxer!!.startRecording()
-
-
-                mIsRecording = true
-            } catch (e: IOException) {
-                e.printStackTrace()
-            }
-        }
-    }
-
     fun startRecording(fd: FileDescriptor?, width: Int, height: Int) {
-        Timber.tag(TAG).d("called startRecording")
         runOnDraw {
             Timber.tag(TAG).d("on start")
             if (mIsRecording) {
@@ -100,7 +75,6 @@ class GPUImageMovieWriter : GPUImageFilter() {
             }
             try {
                 Timber.tag(TAG).d("on start")
-                Log.d(TAG, "on Start")
                 mMuxer = MediaMuxerWrapper(fd)
 
                 // for video capturing

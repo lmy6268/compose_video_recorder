@@ -114,9 +114,10 @@ open class GPUImageFilter @JvmOverloads constructor(
     }
 
     protected fun runPendingOnDrawTasks() {
-        Timber.tag("runPendingOnDrawTasks()").d("%s", runOnDraw.toString());
-        //여기서 로그를 찍으면, runOnDraw에서 입력한 데이터가 보이지 않음.
         synchronized(runOnDraw) {
+//            Timber.tag("runPendingOnDrawTasks()")
+//                .d("%s", if (runOnDraw.isEmpty()) "empty" else "not empty")
+//            //여기서 로그를 찍으면, runOnDraw에서 입력한 데이터가 보이지 않음.
             while (!runOnDraw.isEmpty()) {
                 val item = runOnDraw.removeFirst()
                 item.run()
@@ -193,7 +194,7 @@ open class GPUImageFilter @JvmOverloads constructor(
     protected fun runOnDraw(runnable: Runnable) {
         synchronized(runOnDraw) {
             //여기까지는 진행이 됨.
-            runOnDraw.add(runnable)
+            runOnDraw.addLast(runnable)
         }
     }
 
