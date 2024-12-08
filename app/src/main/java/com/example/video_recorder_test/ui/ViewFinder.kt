@@ -4,6 +4,9 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.view.OrientationEventListener
 import android.view.ViewGroup
@@ -31,6 +34,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.video_recorder_test.FilterList
 import com.example.video_recorder_test.R
 import jp.co.cyberagent.android.gpuimage.GPUImageView
 import jp.co.cyberagent.android.gpuimage.GPUImageView.Companion.RENDERMODE_WHEN_DIRTY
@@ -53,28 +58,41 @@ import jp.co.cyberagent.android.gpuimage.filter.GPUImageMovieWriter
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.callbackFlow
+import java.io.File
 import java.io.FileDescriptor
 import java.util.Locale
 
-fun getFileDescriptor(context: Context, fileName: String): FileDescriptor? {
+fun getFileDescriptor(context: Context, fileName: String): ParcelFileDescriptor? {
+    val localDir = Environment.DIRECTORY_MOVIES
+    val childDir = "MyAppMovies"
+    val contentResolver = context.contentResolver
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        // For Android 10+
+        val values = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            put(MediaStore.Video.Media.RELATIVE_PATH, String.format("%s/%s", localDir, childDir))
+        }
+        val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        val videoUri = contentResolver.insert(collection, values)
 
-    // Define content values for the new video entry
-    val values = ContentValues().apply {
-        put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
-        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-        put(
-            MediaStore.Video.Media.RELATIVE_PATH,
-            "Movies/MyAppFolder"
-        ) // Save in "Movies/MyAppFolder"
-    }
-
-    // Insert the content values to MediaStore and get a Uri
-    val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-    val videoUri: Uri? = context.contentResolver.insert(collection, values)
-
-    return videoUri?.let { uri ->
-        // Open a file descriptor from the Uri
-        context.contentResolver.openFileDescriptor(uri, "rw")?.fileDescriptor
+        videoUri?.let { uri ->
+            contentResolver.openFileDescriptor(uri, "rw")
+        }
+    } else {
+        // For Android 9 and below
+        val dir = String.format(
+            "%s${File.separator}%s",
+            Environment.getExternalStoragePublicDirectory(localDir),
+            childDir
+        )
+        val file = File(dir, fileName).apply {
+            if (exists().not()) {
+                parentFile?.mkdirs()
+                createNewFile()
+            }
+        }
+        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_WRITE)
     }
 }
 
@@ -132,27 +150,40 @@ fun CameraViewFinder(
     val filter = remember {
         GPUImageLookupFilter().apply {
             bitmap = BitmapFactory.decodeResource(
-                context.resources,
-                R.drawable.filter_1
+                context.resources, R.drawable.filter_1
             )
         }
     }
     val video = remember { GPUImageMovieWriter() }
-    var applied by remember {
-        mutableStateOf(GPUImageFilterGroup())
+
+    val appliedFilters = remember {
+        FilterList(
+            filter, video
+        )
     }
-
-
 
     var gpuImageView by remember {
         mutableStateOf<GPUImageView?>(null)
     }
 
 
+    LaunchedEffect(appliedFilters) {
+        snapshotFlow { appliedFilters.state }.collect { curFilter ->
+            gpuImageView?.setFilter(curFilter)
+        }
+    }
+
+    LaunchedEffect(frame) {
+        frame?.data?.let { image ->
+            gpuImageView?.run { setImage(image) }
+        }
+
+    }
+
+
     AnimatedContent(targetState = showCaptureImage, label = "프리뷰 화면") { value ->
         if (value) latestCaptureImage?.data?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
+            Image(bitmap = it.asImageBitmap(),
                 contentDescription = "이미지",
                 modifier = Modifier
                     .fillMaxSize()
@@ -171,27 +202,16 @@ fun CameraViewFinder(
                 )
 
 
-                AndroidView(
-                    factory = {
-                        GPUImageView(it).apply {
-                            setRenderMode(RENDERMODE_WHEN_DIRTY)
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            setBackgroundColor(android.graphics.Color.WHITE)
-                            gpuImageView = this
-                            setFilter(applied.apply { addFilter(filter);addFilter(video) })
-                        }
-                    },
-                    update = {
-                        it.apply {
-                            frame?.run {
-                                setImage(data)
-                            }
-                        }
+                AndroidView(factory = {
+                    GPUImageView(it).apply {
+                        setRenderMode(RENDERMODE_WHEN_DIRTY)
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        setBackgroundColor(android.graphics.Color.WHITE)
+                        gpuImageView = this
                     }
-                )
+                })
                 Row(
                     Modifier
                         .padding(bottom = 10.dp)
@@ -206,18 +226,14 @@ fun CameraViewFinder(
                                 if (!isRecording) {
                                     video.startRecording(
                                         getFileDescriptor(
-                                            context,
-                                            "${System.currentTimeMillis()}.mp4"
-                                        ),
-                                        1080,
-                                        1920
+                                            context, "${System.currentTimeMillis()}.mp4"
+                                        ), 1080, 1920
                                     )
                                     gpuImageView?.getGPUImage()
                                 } else video.stopRecording()
                                 isRecording = !isRecording
                             } else viewModel.takePhoto()
-                        },
-                        modifier = Modifier
+                        }, modifier = Modifier
                             .height(100.dp)
                             .padding(bottom = 50.dp)
                     ) {
@@ -234,9 +250,8 @@ fun CameraViewFinder(
                                 isRecording = false
                                 video.stopRecording()
                             }
-                            viewModel.changeMode(currentMode)
-                        },
-                        modifier = Modifier
+//                            viewModel.changeMode(currentMode)
+                        }, modifier = Modifier
                             .height(100.dp)
                             .padding(bottom = 50.dp)
                     ) {

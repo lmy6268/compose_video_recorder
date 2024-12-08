@@ -1,6 +1,7 @@
 package jp.co.cyberagent.android.gpuimage.filter
 
 import android.opengl.EGL14
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import jp.co.cyberagent.android.gpuimage.encoder.EglCore
 import jp.co.cyberagent.android.gpuimage.encoder.MediaAudioEncoder
@@ -45,17 +46,19 @@ class GPUImageMovieWriter : GPUImageFilter() {
         super.onDraw(textureId, cubeBuffer, textureBuffer)
 
         if (mIsRecording) {
-            // create encoder surface
-            if (mCodecInput == null) {
+            /** [mCodecInput] sometimes turns to null.
+             * */
+            mCodecInput?.let {
+                it.makeCurrent()
+                super.onDraw(textureId, cubeBuffer, textureBuffer)
+                it.swapBuffers()
+                mVideoEncoder!!.frameAvailableSoon()
+            } ?: run {
+
                 mEGLCore = EglCore(EGL14.eglGetCurrentContext(), EglCore.FLAG_RECORDABLE)
                 mCodecInput = WindowSurface(mEGLCore, mVideoEncoder!!.surface, false)
+                Timber.e("mCodecInput is null, skipping encoding.")
             }
-
-            // Draw on encoder surface
-            mCodecInput!!.makeCurrent()
-            super.onDraw(textureId, cubeBuffer, textureBuffer)
-            mCodecInput!!.swapBuffers()
-            mVideoEncoder!!.frameAvailableSoon()
         }
 
         // Make screen surface be current surface
@@ -67,15 +70,13 @@ class GPUImageMovieWriter : GPUImageFilter() {
         releaseEncodeSurface()
     }
 
-    fun startRecording(fd: FileDescriptor?, width: Int, height: Int) {
+    fun startRecording(fd: ParcelFileDescriptor?, width: Int, height: Int) {
         runOnDraw {
-            Timber.tag(TAG).d("on start")
             if (mIsRecording) {
                 return@runOnDraw
             }
             try {
-                Timber.tag(TAG).d("on start")
-                mMuxer = MediaMuxerWrapper(fd)
+                mMuxer = MediaMuxerWrapper(fd?.fileDescriptor)
 
                 // for video capturing
                 mVideoEncoder = MediaVideoEncoder(mMuxer, mMediaEncoderListener, width, height)
@@ -95,8 +96,6 @@ class GPUImageMovieWriter : GPUImageFilter() {
 
     fun stopRecording() {
         runOnDraw {
-            Log.d(TAG, "onStop")
-            Timber.tag(TAG).d("on stop")
             if (!mIsRecording) {
                 return@runOnDraw
             }
@@ -108,14 +107,15 @@ class GPUImageMovieWriter : GPUImageFilter() {
     }
 
     private fun releaseEncodeSurface() {
-        if (mEGLCore != null) {
-            mEGLCore!!.makeNothingCurrent()
-            mEGLCore!!.release()
+
+        mEGLCore?.run {
+            makeNothingCurrent()
+            release()
             mEGLCore = null
         }
 
-        if (mCodecInput != null) {
-            mCodecInput!!.release()
+        mCodecInput?.run {
+            release()
             mCodecInput = null
         }
     }
